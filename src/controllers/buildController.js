@@ -12,87 +12,80 @@ exports.triggerBuild = (req, res) => {
     const envFilePath = path.join(electronProjectPath, '.env');
 
     // Extract data from request body to update the .env file
-    const { version, database_name } = req.body;
+    const { version, database_name, client_id } = req.body;
 
     // Prepare the .env content with the new values
-    const updatedEnvContent = `VERSION=${version}\nDATABASE_NAME=${database_name}\n`;
+    const updatedEnvContent = `VERSION=${version}\nDATABASE_NAME=${database_name}\nCLIENT=${client_id}\n`;
 
     // Write the new content to the .env file
-    fs.writeFile(envFilePath, updatedEnvContent, (err) => {
-        if (err) {
-            console.error(`Failed to update .env file: ${err.message}`);
-            return res.status(500).json({
-                message: 'Failed to update .env file',
-                error: err.message,
-            });
-        }
+    fs.writeFileSync(envFilePath, updatedEnvContent);
 
-        console.log('Successfully updated .env file');
+    // send response as build started message
+    res.status(200).json({ message: 'Build started' });
 
-        // Execute `npm run build` in the Electron project directory
-        const buildProcess = spawn('npm', ['run', 'build'], { cwd: electronProjectPath, shell: true });
-
-        let output = '';
-        let errorOutput = '';
-
-        // Capture stdout and stderr
-        buildProcess.stdout.on('data', (data) => {
-            output += data.toString();
-            console.log(`Build stdout: ${data}`);
-        });
-
-        buildProcess.stderr.on('data', (data) => {
-            errorOutput += data.toString();
-            console.error(`Build stderr: ${data}`);
-        });
-
-        // Handle process completion
-        buildProcess.on('close', (code) => {
-            if (code === 0) {
-                const buildJsonPath = path.join(electronProjectPath, 'dist', 'log.json');
-
-                // Read the build.json file
-                fs.readFile(buildJsonPath, 'utf8', (readErr, buildData) => {
-                    if (readErr) {
-                        console.error(`Failed to read build.json: ${readErr.message}`);
-                        return res.status(500).json({
-                            message: 'Build completed, but failed to read build.json',
-                            error: readErr.message,
-                            output,
-                        });
-                    }
-
-                    try {
-                        const buildJson = JSON.parse(buildData);
-
-                        // Send the response with the build.json data
-                        res.json({
-                            message: 'Build completed successfully',
-                            build: buildJson,
-                        });
-                    } catch (parseErr) {
-                        console.error(`Failed to parse build.json: ${parseErr.message}`);
-                        res.status(500).json({
-                            message: 'Build completed, but failed to parse build.json',
-                            error: parseErr.message,
-                            output,
-                        });
-                    }
-                });
-            } else {
-                res.status(500).json({
-                    message: 'Build failed',
-                    error: errorOutput,
-                });
-            }
-        });
-
-        buildProcess.on('error', (err) => {
-            console.error(`Failed to start build process: ${err.message}`);
-            res.status(500).json({
-                message: 'Failed to start build process',
-                error: err.message,
-            });
-        });
+    // chechout the coopmis-bank-dev branch
+    const checkoutCommand = `git checkout coopmis-bank-dev`;
+    const checkoutProcess = spawn(checkoutCommand, { shell: true, cwd: electronProjectPath });
+    checkoutProcess.stdout.on('data', (data) => {
+        console.log(`stdout: ${data}`);
     });
+    checkoutProcess.stderr.on('data', (data) => {
+        console.error(`stderr: ${data}`);
+    });
+    checkoutProcess.on('close', (code) => {
+        if (code === 0) {
+            console.log('Checkout successful');
+        } else {
+            console.error(`Error checking out branch: ${code}`);
+        }
+    });
+
+    // delete the node_modules folder
+    const nodeModulesPath = path.join(electronProjectPath, 'node_modules');
+    if (fs.existsSync(nodeModulesPath)) {
+        fs.rmSync(nodeModulesPath, { recursive: true, force: true });
+    }
+
+    // install dependencies with clean install
+    const installCommand = 'npm install';
+    const installProcess = spawn(installCommand, { shell: true, cwd: electronProjectPath });
+    installProcess.stdout.on('data', (data) => {
+        console.log(`stdout: ${data}`);
+    });
+    installProcess.stderr.on('data', (data) => {
+        console.error(`stderr: ${data}`);
+    });
+    installProcess.on('close', (code) => {
+        if (code === 0) {
+            console.log('Dependencies installed successfully');
+        } else {
+            console.error(`Error installing dependencies: ${code}`);
+        }
+    });
+
+    // build the electron app
+    const buildCommand = 'npm run build';
+    const buildProcess = spawn(buildCommand, { shell: true, cwd: electronProjectPath });
+    buildProcess.stdout.on('data', (data) => {
+        console.log(`stdout: ${data}`);
+    });
+    buildProcess.stderr.on('data', (data) => {
+        console.error(`stderr: ${data}`);
+    });
+    buildProcess.on('close', (code) => {
+        if (code === 0) {
+            console.log('Build successful');
+        } else {
+            console.error(`Error building app: ${code}`);
+        }
+    });
+
+    // read the log.JSON file in the disr/client_id folder
+    const logFilePath = path.join(electronProjectPath, 'dist', client_id,'bank', 'log.JSON');
+    const logFileContent = fs.readFileSync(logFilePath, 'utf8');
+    
+    const { BuildArtifacts, ...otherData } = data;
+    const buildArtafact = logFileContent.BuildArtifacts;
+
+    
 };
