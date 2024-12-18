@@ -278,22 +278,6 @@ exports.triggerBuild = (req, res) => {
         }
     };
 
-    // Function to store build artifacts
-    const storeBuild = (appType, version) => {
-        const distPath = path.join(electronProjectPath, 'dist');
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const buildPath = path.join(buildStoragePath, appType, `${version}_${timestamp}`);
-        
-        try {
-            copyDir(distPath, buildPath);
-            console.log(`Build artifacts stored in: ${buildPath}`);
-            return true;
-        } catch (err) {
-            console.error('Error storing build:', err);
-            return false;
-        }
-    };
-
     // Function to build an app
     const buildApp = (appType, branchName) => {
         return new Promise((resolve, reject) => {
